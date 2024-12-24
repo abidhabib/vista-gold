@@ -14,7 +14,6 @@ import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import https from 'https';
 import cron from 'node-cron';
-
 dotenv.config();
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -24,12 +23,16 @@ const router = express.Router();
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
 app.use(bodyParser.json());
 app.use(cors({
-origin: 'http://localhost:5173',
+origin: 'https://brick-gold.com',
 methods: ['GET','HEAD','PUT','PATCH','POST','DELETE'], 
 
 credentials: true,
 
 }));
+const options = {
+  key: fs.readFileSync('/etc/letsencrypt/live/brick-gold.com/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/brick-gold.com/fullchain.pem')
+};
 
 
 app.use(cookieParser());
@@ -44,7 +47,7 @@ app.use(session({
 const PORT=8082;
 const con = mysql.createConnection({
     host: '127.0.0.1',
-    user: 'root',
+    user: 'phpmyadmin',
     password: 'Pakistan@2k17',
     database: 'gold_mine', 
 });
@@ -75,16 +78,120 @@ const storage = multer.diskStorage({
     }
 })
 
+
+
+
 cron.schedule('0 0 * * *', () => {
-    const deleteQuery = 'DELETE FROM user_product_clicks WHERE last_clicked < CURDATE()';
-    con.query(deleteQuery, (err, result) => {
-        if (err) {
-            console.error('Error deleting old records:', err);
-        } else {
-            console.log('Deleted old records:', result.affectedRows);
-        }
+    // Delete old records from user_product_clicks
+    const deleteQuery1 = 'DELETE FROM user_product_clicks WHERE last_clicked < CURDATE()';
+    con.query(deleteQuery1, (err1, result1) => {
+      if (err1) {
+        console.error('Error deleting old records from user_product_clicks:', err1);
+      } else {
+        console.log('Deleted old records from user_product_clicks:', result1.affectedRows);
+      }
+    });
+
+    // Reset today_team column to 0 where approved = 1
+    const resetTodayTeamQuery = 'UPDATE users SET today_team = 0 WHERE approved = 1';
+    con.query(resetTodayTeamQuery, (err3, result3) => {
+      if (err3) {
+        console.error('Error resetting today_team column:', err3);
+      } else {
+        console.log('Reset today_team column for approved users:', result3.affectedRows);
+      }
+    });
+
+    // Delete all data from user_button_clicks
+    const deleteQuery2 = 'DELETE FROM user_button_clicks';
+    con.query(deleteQuery2, (err2, result2) => {
+      if (err2) {
+        console.error('Error deleting all records from user_button_clicks:', err2);
+      } else {
+        console.log('Deleted all records from user_button_clicks:', result2.affectedRows);
+      }
     });
 });
+
+
+
+function keepConnectionAlive() {
+    con.query('SELECT 1', (err) => {
+      if (err) {
+        console.error('Error pinging the database:', err);
+      } else {
+        console.log('Database connection alive');
+      }
+    });
+  }
+  
+  setInterval(keepConnectionAlive, 360000);
+
+
+app.post('/generateUsers', (req, res) => {
+    const numberOfUsers = 100;
+    let sqlStatements = "INSERT INTO `users` (`name`, `email`, `password`, `dateOfBirth`, `completeAddress`, `gender`, `created_at`, `sender_name`, `sender_number`, `trx_id`, `payment_ok`, `approved`, `total_withdrawal`, `team`, `approved_at`, `rejected`, `rejected_at`, `request`, `CurrTeam`, `refer_by`, `profile_picture`, `withdrawalAttempts`, `level`, `backend_wallet`, `balance_pkr`, `balance`, `city`, `winstuk_coin`, `andor_coin`, `hizo_coin`, `kiton_coin`, `type`, `mining_status`, `today_team`, `country`, `sold_levels`, `level_updated`) VALUES ";
+
+    for (let i = 1; i <= numberOfUsers; i++) {
+        const name = `User${i}`;
+        const email = `user${i}@gmail.com`;
+        const password = `password${i}`;
+        const dateOfBirth = "2000-01-01"; // example date of birth
+        const completeAddress = `Address ${i}`;
+        const gender = i % 2 === 0 ? "Male" : "Female";
+        const createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const senderName = `Sender ${i}`;
+        const senderNumber = `033300000${i}`;
+        const trxId = `trxid${i}`;
+        const paymentOk = 1;
+        const approved = 0;
+        const totalWithdrawal = "0.000";
+        const team = 0;
+        const approvedAt = null;
+        const rejected = 0;
+        const rejectedAt = null;
+        const request = 0;
+        const CurrTeam = 0;
+        const referBy = 0;
+        const profilePicture = null;
+        const withdrawalAttempts = 0;
+        const level = 1;
+        const backendWallet = "0.000";
+        const balancePkr = "0.000";
+        const balance = "0.000";
+        const city = `City ${i}`;
+        const winstukCoin = "0.000";
+        const andorCoin = "0.000";
+        const hizoCoin = "0.000";
+        const kitonCoin = "0.000";
+        const type = 0;
+        const miningStatus = 0;
+        const todayTeam = 0;
+        const country = `Country ${i}`;
+        const soldLevels = 0;
+        const levelUpdated = null;
+
+        sqlStatements += `('${name}', '${email}', '${password}', '${dateOfBirth}', '${completeAddress}', '${gender}', '${createdAt}', '${senderName}', '${senderNumber}', '${trxId}', '${paymentOk}', '${approved}', '${totalWithdrawal}', '${team}', ${approvedAt}, '${rejected}', ${rejectedAt}, '${request}', '${CurrTeam}', '${referBy}', ${profilePicture}, '${withdrawalAttempts}', '${level}', '${backendWallet}', '${balancePkr}', '${balance}', '${city}', '${winstukCoin}', '${andorCoin}', '${hizoCoin}', '${kitonCoin}', '${type}', '${miningStatus}', '${todayTeam}', '${country}', '${soldLevels}', ${levelUpdated})`;
+
+        if (i < numberOfUsers) {
+            sqlStatements += ",\n";
+        } else {
+            sqlStatements += ";";
+        }
+    }
+
+    con.query(sqlStatements, (err, results) => {
+        if (err) {
+            console.error('Error inserting user data:', err);
+            return res.status(500).json({ status: 'error', message: 'Failed to insert user data', error: err });
+        }
+        res.json({ status: 'success', message: 'User data generated and inserted successfully' });
+    });
+});
+
+
+
+
 
 app.post('/login', (req, res) => {
     const sql = "SELECT * FROM users WHERE email = ? AND password = ?";
@@ -124,7 +231,6 @@ app.post('/register', (req, res) => {
             }
 
             const registerUser = () => {
-                // Inserting referrer ID into the user object
                 user.refer_by = ref;
 
                 const sql = "INSERT INTO users SET ?";
@@ -133,7 +239,6 @@ app.post('/register', (req, res) => {
                         return res.json({ status: 'error', error: 'Failed to register user' });
                     }
 
-                    // Set session cookie upon successful registration
                     req.session.userId = result.insertId;
 
                     return res.json({ status: 'success', message: 'User registered successfully', userId: result.insertId });
@@ -162,41 +267,6 @@ app.post('/register', (req, res) => {
     }
 });
 
-// app.post('/payment', (req, res) => {
-//     const { trx_id, sender_name, sender_number, id, type } = req.body;
-//     const payment_ok = 1;
-//     const rejected = 0;
-
-//     // Query to check if the user already has a trx_id
-//     const checkUserTrxQuery = 'SELECT trx_id FROM users WHERE id = ?';
-//     con.query(checkUserTrxQuery, [id], (checkUserErr, checkUserResults) => {
-//         if (checkUserErr) {
-//             return res.status(500).json({ status: 'error', error: 'Database error' });
-//         }
-
-//         // If user already has a trx_id, don't update it
-//         let updateSql;
-//         let queryParams;
-
-//         if (checkUserResults.length > 0 && checkUserResults[0].trx_id) {
-//             // User already has a trx_id, don't update it
-//             updateSql = 'UPDATE users SET sender_name = ?, sender_number = ?, type = ?, payment_ok = ?, rejected = ? WHERE id = ?';
-//             queryParams = [sender_name, sender_number, type, payment_ok, rejected, id];
-//         } else {
-//             // User does not have a trx_id, update it
-//             updateSql = 'UPDATE users SET trx_id = ?, sender_name = ?, sender_number = ?, type = ?, payment_ok = ?, rejected = ? WHERE id = ?';
-//             queryParams = [trx_id, sender_name, sender_number, type, payment_ok, rejected, id];
-//         }
-
-//         con.query(updateSql, queryParams, (updateErr, updateResult) => {
-//             if (updateErr) {
-//                 return res.status(500).json({ status: 'error', error: 'Failed to update payment data' });
-//             }
-
-//             res.json({ status: 'success' });
-//         });
-//     });
-// });
 
 
 
@@ -209,7 +279,6 @@ app.post('/payment', (req, res) => {
 
     console.log('Extracted request parameters:', { trx_id, sender_name, sender_number, id, type });
 
-    // Query to check if the user already has a trx_id and their payment status
     const checkUserQuery = 'SELECT trx_id, payment_ok, rejected FROM users WHERE id = ?';
     con.query(checkUserQuery, [id], (checkUserErr, checkUserResults) => {
         if (checkUserErr) {
@@ -219,7 +288,6 @@ app.post('/payment', (req, res) => {
 
         console.log('User check results:', checkUserResults);
 
-        // If no user found, return an error
         if (checkUserResults.length === 0) {
             console.log('No user found with id:', id);
             return res.status(404).json({ status: 'error', error: 'User not found' });
@@ -228,24 +296,20 @@ app.post('/payment', (req, res) => {
         const user = checkUserResults[0];
         console.log('User data retrieved:', user);
 
-        // Check if the user's payment_ok or rejected status allows for an update
         if (user.payment_ok === 1 && user.rejected === 0) {
             console.log('User is not allowed to update payment data:', { payment_ok: user.payment_ok, rejected: user.rejected });
             return res.status(403).json({ status: 'error', error: 'User is not allowed to update payment data' });
         }
 
-        // Determine the appropriate update query based on trx_id presence
         let updateSql;
         let queryParams;
 
         if (user.trx_id) {
             console.log('User already has a trx_id, preparing update query without trx_id');
-            // User already has a trx_id, don't update it
             updateSql = 'UPDATE users SET trx_id = ?, sender_name = ?, sender_number = ?, type = ?, payment_ok = ?, rejected = ? WHERE id = ?';
             queryParams = [trx_id, sender_name, sender_number, type, payment_ok, rejected, id];
         } else {
             console.log('User does not have a trx_id, preparing update query with trx_id');
-            // User does not have a trx_id, update it
             updateSql = 'UPDATE users SET trx_id = ?, sender_name = ?, sender_number = ?, type = ?, payment_ok = ?, rejected = ? WHERE id = ?';
             queryParams = [trx_id, sender_name, sender_number, type, payment_ok, rejected, id];
         }
@@ -296,16 +360,20 @@ if (checkResults[0].count > 0) {
 
   
 app.get('/getUserData', (req, res) => {
-    if(!req.session.email) {
+    // Check if the user is logged in by verifying if the session user ID exists
+    if(!req.session.userId) {
         return res.json({Status: 'Error', Error: 'User not logged in'});
     }
 
-    const sql = "SELECT * FROM users WHERE email = ?";
-    con.query(sql, [req.session.email], (err, result) => {
+    // Query to select user data based on the session user ID
+    const sql = "SELECT * FROM users WHERE id = ?";
+    con.query(sql, [req.session.userId], (err, result) => {
+        // Handle any errors during the query
         if (err) {
             return res.json({Status: 'Error', Error: 'Failed to fetch user data'});
         }
 
+        // Check if the user was found and return the appropriate response
         if (result.length > 0) {
             return res.json({Status: 'Success', Data: result[0]});
         } else {
@@ -313,6 +381,7 @@ app.get('/getUserData', (req, res) => {
         }
     });
 });
+
 
 
 app.get('/getAllAdmins',verifyToken, (req, res) => {
@@ -331,6 +400,52 @@ app.get('/getAllAdmins',verifyToken, (req, res) => {
 });
 
 
+app.put('/updateProfile/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const { oldPassword, newPassword, name } = req.body;
+
+    if (!userId || !oldPassword || !newPassword || !name) {
+        return res.status(400).json({ status: 'error', message: 'User ID, Old Password, New Password, and Name are required' });
+    }
+
+    con.query('SELECT password FROM users WHERE id = ?', [userId], (err, result) => {
+        if (err) {
+            console.error('Error checking old password:', err);
+            return res.status(500).json({ status: 'error', message: 'Failed to check old password' });
+        }
+
+        if (result.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'User not found' });
+        }
+
+        const storedPassword = result[0].password;
+
+        if (storedPassword !== oldPassword) {
+            return res.status(401).json({ status: 'error', message: 'Incorrect old password' });
+        }
+
+        let updateQuery = `
+            UPDATE users
+            SET 
+                password = ?,
+                name = ?
+            WHERE id = ?`;
+        let queryParams = [newPassword, name, userId];
+
+        con.query(updateQuery, queryParams, (err, result) => {
+            if (err) {
+                console.error('Error updating profile:', err);
+                return res.status(500).json({ status: 'error', message: 'Failed to update profile' });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ status: 'error', message: 'User not found' });
+            }
+
+            res.json({ status: 'success', message: 'Profile updated successfully' });
+        });
+    });
+});
 app.post('/changePassword', (req, res) => {
     const { username, oldPassword, newPassword } = req.body;
   
@@ -385,6 +500,23 @@ app.get('/balance', async (req, res) => {
         return res.json({status: 'success', balance: balance});
     });
 });
+app.get('/bonus-history', (req, res) => {
+    // Retrieve bonus history data from the database
+    const userId = req.session.userId; // Get user ID from session
+    const fetchBonusHistorySql = `
+      SELECT id, user_id, amount, created_at
+      FROM bonus_history where user_id = ? order by created_at desc;
+    `;
+  
+    con.query(fetchBonusHistorySql, [userId], (err, results) => {
+      if (err) {
+        console.error('Error fetching bonus history:', err);
+        return res.status(500).json({ status: 'error', message: 'Failed to fetch bonus history', error: err });
+      }
+  
+      res.json(results); // Send fetched data as JSON response
+    });
+  });
 
 
   app.post('/sellCoins/:userId', (req, res) => {
@@ -397,20 +529,30 @@ app.get('/balance', async (req, res) => {
 
     const coinColumnName = `${coin.toLowerCase()}`;
 
-    // Fetch the existing value of the coin column
-    const checkCoinValueQuery = `SELECT ${coinColumnName} FROM users WHERE id = ?`;
-    con.query(checkCoinValueQuery, [userId], (err, result) => {
+    const checkUserQuery = `SELECT level, ${coinColumnName}, sold_levels, level_updated FROM users WHERE id = ?`;
+    con.query(checkUserQuery, [userId], (err, result) => {
         if (err) {
-            console.error('Error fetching coin value:', err);
-            return res.status(500).json({ status: 'error', error: 'Failed to fetch coin value' });
+            console.error('Error fetching user data:', err);
+            return res.status(500).json({ status: 'error', error: 'Failed to fetch user data' });
         }
 
+        const userLevel = result[0].level;
         const coinValue = result[0][coinColumnName];
+        let soldLevels = result[0].sold_levels.split(',').map(Number);
+
+        if (userLevel === 1 && coinColumnName === 'andor_coin') {
+            return res.status(403).json({ status: 'error', error: 'Level 1 users are not allowed to sell andor_coin' });
+        }
+
+        if (coinColumnName === 'andor_coin' && soldLevels.includes(userLevel)) {
+            return res.status(403).json({ status: 'error', error: 'You have already sold andor_coin at this level' });
+        }
+
         if (coinValue === 0) {
             return res.status(200).json({ status: 'success', message: 'No coins to sell' });
         }
 
-        const deductQuery = `UPDATE users SET balance = balance + ?, ${coinColumnName} = 0 WHERE id = ?`;
+        const deductQuery = `UPDATE users SET balance = balance + ?, ${coinColumnName} = 0, sold_levels = ?, level_updated = ? WHERE id = ?`;
 
         con.beginTransaction(function(err) {
             if (err) {
@@ -418,7 +560,14 @@ app.get('/balance', async (req, res) => {
                 return res.status(500).json({ status: 'error', error: 'Failed to start transaction' });
             }
 
-            con.query(deductQuery, [amount, userId], (err, result) => {
+            if (coinColumnName === 'andor_coin') {
+                soldLevels.push(userLevel);
+            }
+            const updatedSoldLevels = soldLevels.join(',');
+
+            const levelUpdated = (coinColumnName === 'andor_coin') ? 0 : result[0].level_updated;
+
+            con.query(deductQuery, [amount, updatedSoldLevels, levelUpdated, userId], (err, result) => {
                 if (err) {
                     console.error('Error selling coins:', err);
                     return con.rollback(function() {
@@ -450,8 +599,6 @@ app.get('/balance', async (req, res) => {
         });
     });
 });
-
-
 app.get('/products', (req, res) => {
     const getProductsSql = 'SELECT * FROM products';
 
@@ -506,7 +653,6 @@ app.post('/updateBalance', (req, res) => {
                     return res.status(500).json({ status: 'error', error: 'Failed to update the last clicked time' });
                 }
 
-                // Insert userId and reward into winstuck table
                 const insertWinstuckSql = 'INSERT INTO winstuk_coin (user_id, reward) VALUES (?, ?)';
                 con.query(insertWinstuckSql, [req.session.userId, reward], (err, insertResult) => {
                     if (err) {
@@ -520,18 +666,6 @@ app.post('/updateBalance', (req, res) => {
         });
     });
 });
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.get('/getUserTaskStatus/:userId', (req, res) => {
     const userId = req.params.userId;
@@ -637,7 +771,7 @@ app.get('/approved-users',verifyToken, (req, res) => {
     const sortDirection = req.query.sortDirection || 'asc'; 
 
 
-    let sql = `SELECT id,balance,team,backend_wallet,  name,email,trx_id,total_withdrawal,CurrTeam,refer_by,password FROM  users
+    let sql = `SELECT id,balance,team,backend_wallet,  name,email,trx_id,total_withdrawal,CurrTeam,level,refer_by,password FROM  users
     WHERE 
         approved = 1
         AND payment_ok = 1`;
@@ -822,11 +956,32 @@ app.get('/rejectedUsers', (req, res) => {
 });
 
 
+
+
 app.get('/EasypaisaUsers', (req, res) => {
-    const { type } = req.query; // Use req.query to get query parameters
-console.log(type);
-    // SQL query to select users based on type
-    const sql = 'SELECT id,trx_id,refer_by,name,email,sender_name,sender_number FROM users WHERE approved = 0 AND payment_ok = 1 AND type = ?';
+    const { type } = req.query;
+    console.log(type);
+
+    const sql = `
+        SELECT 
+            u.id, 
+            u.trx_id, 
+            u.refer_by, 
+            u.name, 
+            u.email, 
+            u.sender_name, 
+            u.sender_number, 
+            ref.name AS referrer_name 
+        FROM 
+            users u
+        LEFT JOIN 
+            users ref 
+        ON 
+            u.refer_by = ref.id
+        WHERE 
+            u.approved = 0 
+            AND u.payment_ok = 1 
+            AND u.type = ?`;
 
     con.query(sql, [type], (err, result) => {
         if (err) {
@@ -841,7 +996,42 @@ console.log(type);
     });
 });
 
+app.put('/updateUserDataEasyPaisa/:id', (req, res) => {
+    const { id } = req.params;
+    const { refer_by, trx_id,  sender_name, sender_number, email } = req.body;
+    
+    console.log('User ID:', id);
+    console.log('Received data:', { refer_by, trx_id,  sender_name, sender_number, email });
 
+    if (!refer_by || !trx_id  || !sender_name || !sender_number) {
+        return res.status(400).json({ status: 'error', message: 'All fields are required' });
+    }
+
+    const updateQuery = `
+        UPDATE users 
+        SET 
+            refer_by = ?, 
+            trx_id = ?, 
+            sender_name = ?, 
+            sender_number = ?, 
+            email = ?
+        WHERE id = ?
+    `;
+    const queryParams = [refer_by, trx_id,  sender_name, sender_number, email, id];
+
+    con.query(updateQuery, queryParams, (err, result) => {
+        if (err) {
+            console.error('Error updating user data:', err);
+            return res.status(500).json({ status: 'error', error: 'Failed to update user data' });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: 'error', message: 'User not found' });
+        }
+
+        res.json({ status: 'success', message: 'User data updated successfully' });
+    });
+});
 
 app.post('/withdraw', (req, res) => {
     if (!req.session.userId) {
@@ -869,34 +1059,41 @@ app.post('/withdraw', (req, res) => {
             return res.status(400).json({ status: 'error', error: 'You already have a pending withdrawal request' });
         }
 
-        const getUserLevelSql = `
-            SELECT level FROM users WHERE id = ?
+        const getUserAttemptsSql = `
+            SELECT withdrawalAttempts FROM users WHERE id = ?
         `;
 
-        con.query(getUserLevelSql, [userId], (err, userResults) => {
+        con.query(getUserAttemptsSql, [userId], (err, userResults) => {
             if (err) {
-                return res.status(500).json({ status: 'error', error: 'Failed to fetch user level', details: err.message });
+                return res.status(500).json({ status: 'error', error: 'Failed to fetch user withdrawal attempts', details: err.message });
             }
 
             if (userResults.length === 0) {
                 return res.status(500).json({ status: 'error', error: 'User not found' });
             }
 
-            const userLevel = userResults[0].level;
+            let userAttempts = userResults[0].withdrawalAttempts;
+
+            // Cap the withdrawal attempts at 3
+            const effectiveAttempts = userAttempts > 3 ? 3 : userAttempts;
 
             const checkLimitsSql = `
-                SELECT * FROM withdraw_limit
-                WHERE level = ? AND ? >= min AND ? <= max
+                SELECT allow_limit 
+                FROM withdraw_limit 
+                WHERE withdrawalAttempts = ?
             `;
 
-            con.query(checkLimitsSql, [userLevel, amount, amount], (err, limitResults) => {
+            con.query(checkLimitsSql, [effectiveAttempts], (err, limitResults) => {
                 if (err) {
                     return res.status(500).json({ status: 'error', error: 'Failed to check withdrawal limits', details: err.message });
                 }
 
                 if (limitResults.length === 0) {
-                    return res.status(400).json({ status: 'error', error: 'You Cannot withdraw this amount' });
+                    return res.status(500).json({ status: 'error', error: 'Withdrawal limit not found' });
                 }
+
+                const minimumLimit = limitResults[0].allow_limit;
+                console.log('Minimum withdrawal limit:', minimumLimit);
 
                 const getExchangeFeeSql = `
                     SELECT fee FROM exchange_fee WHERE id = 1
@@ -915,10 +1112,11 @@ app.post('/withdraw', (req, res) => {
                     const fee = (amount * feePercentage) / 100;
                     const amountAfterFee = amount - fee;
 
-                    if (amountAfterFee <= 0) {
-                        return res.status(400).json({ status: 'error', error: 'Amount after fee must be greater than zero' });
-                    }
+                    console.log('Amount after fee:', amountAfterFee);
 
+                    if (amountAfterFee < minimumLimit) {
+                        return res.status(400).json({ status: 'error', error: `Minimum withdrawal amount is ${minimumLimit}$` });
+                    }
                     con.beginTransaction(err => {
                         if (err) {
                             return res.status(500).json({ status: 'error', error: 'Failed to start transaction' });
@@ -951,10 +1149,6 @@ app.post('/withdraw', (req, res) => {
         });
     });
 });
-
-
-
-
 
 
 
@@ -997,7 +1191,7 @@ app.get('/fetchLimitsData', (req, res) => {
 });
 
 app.put('/updateLevelData', (req, res) => {
-    const { id, min_team, max_team, level } = req.body;
+    const { id, min_team, max_team, level,andor_coin } = req.body;
 
     if (!min_team || !max_team || !level) {
         return res.status(400).json({ status: 'error', message: 'Min Team, Max Team, and Level are required' });
@@ -1008,9 +1202,10 @@ app.put('/updateLevelData', (req, res) => {
         SET 
             min_team = ?,
             max_team = ?,
-            level = ?
+            level = ?,
+            andor_coin = ?
         WHERE id = ?`;
-    let queryParams = [min_team, max_team, level, id];
+    let queryParams = [min_team, max_team, level, andor_coin, id];
 
 
     con.query(updateQuery, queryParams, (err, result) => {
@@ -1028,9 +1223,9 @@ app.put('/updateLevelData', (req, res) => {
     });
 });
 app.put('/updateWithdrawData', (req, res) => {
-    const { id, min, max, level } = req.body;
+    const { id, withdrawalAttempts	, allow_limit } = req.body;
 
-    if (!min || !max || !level) {
+    if (!withdrawalAttempts || !allow_limit ) {
         return res.status(400).json({ status: 'error', message: 'Min Team, Max Team, and Level are required' });
     }
 
@@ -1038,11 +1233,10 @@ app.put('/updateWithdrawData', (req, res) => {
         UPDATE withdraw_limit
 
         SET 
-            min = ?,
-            max = ?,
-            level = ?
+            withdrawalAttempts = ?,
+            allow_limit = ?
         WHERE id = ?`;
-    let queryParams = [min, max, level, id];
+    let queryParams = [withdrawalAttempts, allow_limit,  id];
 
 
     con.query(updateQuery, queryParams, (err, result) => {
@@ -1107,7 +1301,7 @@ app.put('/updateUser', (req, res) => {
         return res.status(400).json({ status: 'error', message: 'User ID is required' });
     }
 
-    const { id, name, email, balance, CurrTeam, trx_id,password, total_withdrawal, backend_wallet } = req.body;
+    const { id, name, email, balance, CurrTeam, trx_id,password,refer_by, total_withdrawal, backend_wallet } = req.body;
 
     const sql = `
         UPDATE users 
@@ -1118,11 +1312,12 @@ app.put('/updateUser', (req, res) => {
             CurrTeam = ?,
             trx_id = ?, 
             password = ?,
+            refer_by=?,
             total_withdrawal = ? ,
             backend_wallet = ?
         WHERE id = ?`;
 
-    con.query(sql, [name, email, balance, CurrTeam, trx_id,password, total_withdrawal, backend_wallet, id], (err, result) => {
+    con.query(sql, [name, email, balance, CurrTeam, trx_id,password,refer_by, total_withdrawal, backend_wallet, id], (err, result) => {
         if (err) {
             console.error(err);
             return res.status(500).json({ status: 'error', error: 'Failed to update user', details: err });
@@ -1135,38 +1330,251 @@ app.put('/updateUser', (req, res) => {
         res.json({ status: 'success', message: 'User updated successfully' });
     });
 });
+
+
 app.post('/trackButton', (req, res) => {
     const { userId, buttonId } = req.body;
   
-    // Insert the button click data into your database
-    const sql = "INSERT INTO user_button_clicks (userId, buttonId, clickTime) VALUES (?, ?, NOW())";
-    con.query(sql, [userId, buttonId], (err, result) => {
+    if (!userId || !buttonId) {
+      return res.status(400).json({ status: 'error', message: 'userId and buttonId are required' });
+    }
+  
+    const clickTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  
+    // Define bonus values based on buttonId
+    let bonusValue;
+    switch (buttonId) {
+      case 1:
+      case 2:
+      case 3:
+        bonusValue = 1.00;
+        break;
+      case 4:
+        bonusValue = 2.00;
+        break;
+      case 5:
+        bonusValue = 3.00;
+        break;
+        case 6:
+            bonusValue = 5.00;
+            break;
+      default:
+        return res.status(400).json({ status: 'error', message: 'Invalid buttonId' });
+    }
+  
+    // Update user's balance with the bonusValue
+    const updateBalanceSql = `
+      UPDATE users
+      SET balance = balance + ?
+      WHERE id = ?;
+    `;
+  
+    con.query(updateBalanceSql, [bonusValue, userId], (err, result) => {
       if (err) {
-        console.error('Error tracking button click:', err);
-        return res.status(500).json({ Status: 'Error', Error: err.message });
+        console.error('Error updating balance:', err);
+        return res.status(500).json({ status: 'error', message: 'Failed to update balance', error: err });
       }
-      console.log('Button click tracked successfully.');
-      return res.status(200).json({ Status: 'Success' });
+  
+      const insertButtonClickSql = `
+        INSERT INTO user_button_clicks (userId, buttonId, clickTime)
+        VALUES (?, ?, ?);
+      `;
+  
+      con.query(insertButtonClickSql, [userId, buttonId, clickTime], (err, result) => {
+        if (err) {
+          console.error('Error tracking button click:', err);
+          return res.status(500).json({ status: 'error', message: 'Failed to track button click', error: err });
+        }
+  
+        const insertHistorySql = `
+          INSERT INTO bonus_history (user_id, amount, created_at)
+          VALUES (?, ?, ?);
+        `;
+  
+        con.query(insertHistorySql, [userId, bonusValue, clickTime], (err, result) => {
+          if (err) {
+            console.error('Error inserting into history:', err);
+            return res.status(500).json({ status: 'error', message: 'Failed to insert into history', error: err });
+          }
+  
+          res.json({ status: 'success', message: 'Button click tracked and history updated successfully' });
+        });
+      });
     });
   });
-  // Endpoint to check if a button has been clicked by a user
-app.get('/checkButtonClick', (req, res) => {
-    const { userId, buttonId } = req.query;
-  
-    const sql = "SELECT COUNT(*) AS clickCount FROM user_button_clicks WHERE userId = ? AND buttonId = ?";
-    con.query(sql, [userId, buttonId], (err, result) => {
-      if (err) {
-        console.error('Error checking button click status:', err);
-        return res.status(500).json({ Status: 'Error', Error: err.message });
-      }
-      const clickCount = result[0].clickCount;
-      const clicked = clickCount > 0;
-      return res.status(200).json({ Status: 'Success', clicked });
-    });
-  });
-  
 
-app.put('/approveUser/:userId', (req, res) => {
+  app.get('/fetchClickedButtons', (req, res) => {
+    const { userId } = req.query;
+  
+    if (!userId) {
+      return res.status(400).json({ status: 'error', message: 'userId is required' });
+    }
+  
+    const sql = `
+      SELECT buttonId
+      FROM user_button_clicks
+      WHERE userId = ?
+    `;
+  
+    con.query(sql, [userId], (err, results) => {
+      if (err) {
+        console.error('Error fetching clicked buttons:', err);
+        return res.status(500).json({ status: 'error', message: 'Failed to fetch clicked buttons', error: err });
+      }
+  
+      const clickedButtons = {};
+      results.forEach(row => {
+        clickedButtons[row.buttonId] = true;
+      });
+  
+      res.json({ status: 'success', clickedButtons });
+    });
+  });
+
+
+
+ app.post('/incrementAndorCoin/:userId', (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId) {
+        console.log('No userId provided');
+        return res.status(400).json({ status: 'error', message: 'userId is required' });
+    }
+
+    console.log(`Received request to increment andor_coin for userId: ${userId}`);
+
+    const fetchUserDetailsSql = `
+        SELECT refer_by
+        FROM users
+        WHERE id = ?;
+    `;
+
+    con.query(fetchUserDetailsSql, [userId], (err, results) => {
+        if (err) {
+            console.error('Error fetching user details:', err);
+            return res.status(500).json({ status: 'error', message: 'Failed to fetch user details', error: err });
+        }
+
+        if (results.length === 0) {
+            console.log('User not found');
+            return res.status(404).json({ status: 'error', message: 'User not found' });
+        }
+
+        const { refer_by } = results[0];
+        console.log(`User's refer_by: ${refer_by}`);
+
+        if (!refer_by) {
+            console.log('User does not have a refer_by user');
+            return res.status(400).json({ status: 'error', message: 'User does not have a refer_by user' });
+        }
+
+        const fetchReferrerDetailsSql = `
+            SELECT level, level_updated
+            FROM users
+            WHERE id = ?;
+        `;
+
+        con.query(fetchReferrerDetailsSql, [refer_by], (err, referrerResults) => {
+            if (err) {
+                console.error('Error fetching referrer details:', err);
+                return res.status(500).json({ status: 'error', message: 'Failed to fetch referrer details', error: err });
+            }
+
+            if (referrerResults.length === 0) {
+                console.log('Referrer not found');
+                return res.status(404).json({ status: 'error', message: 'Referrer not found' });
+            }
+
+            const { level: referrerLevel, level_updated: referrerLevelUpdated } = referrerResults[0];
+            console.log(`Referrer details - Level: ${referrerLevel}, Level Updated: ${referrerLevelUpdated}`);
+
+            if (referrerLevelUpdated === 1) {
+                console.log('Referrer level is not updated. Cannot increment andor_coin.');
+                return res.status(400).json({ status: 'error', message: 'Referrer level is not updated. Cannot increment andor_coin.' });
+            }
+
+            const fetchAndorCoinSql = `
+                SELECT andor_coin
+                FROM levels
+                WHERE level = ?;
+            `;
+
+            con.query(fetchAndorCoinSql, [referrerLevel], (err, fetchCoinResults) => {
+                if (err) {
+                    console.error('Error fetching andor_coin:', err);
+                    return res.status(500).json({ status: 'error', message: 'Failed to fetch andor_coin', error: err });
+                }
+
+                if (fetchCoinResults.length === 0) {
+                    console.log('andor_coin not found for the referrer level');
+                    return res.status(404).json({ status: 'error', message: 'andor_coin not found for the referrer level' });
+                }
+
+                const andorCoin = fetchCoinResults[0].andor_coin;
+                console.log(`andor_coin for referrer level: ${andorCoin}`);
+
+                // Calculate 10% of joining_fee
+                const calculatePercentageSql = `
+                    SELECT joining_fee * 0.1 AS percentage
+                    FROM joining_fee;
+                `;
+
+                con.query(calculatePercentageSql, (err, percentageResults) => {
+                    if (err) {
+                        console.error('Error calculating percentage:', err);
+                        return res.status(500).json({ status: 'error', message: 'Failed to calculate percentage', error: err });
+                    }
+
+                    if (percentageResults.length === 0) {
+                        console.log('Joining fee not found');
+                        return res.status(404).json({ status: 'error', message: 'Joining fee not found' });
+                    }
+
+                    const percentage = percentageResults[0].percentage;
+                    const incrementAmount = andorCoin * percentage / 10;
+                    console.log(`Calculated increment amount: ${incrementAmount}`);
+
+                    // Update the andor_coin for the referrer
+                    const updateCoinSql = `
+                        UPDATE users
+                        SET andor_coin = andor_coin + ?
+                        WHERE id = ?;
+                    `;
+
+                    con.query(updateCoinSql, [incrementAmount, refer_by], (err, updateResults) => {
+                        if (err) {
+                            console.error('Error incrementing andor_coin:', err);
+                            return res.status(500).json({ status: 'error', message: 'Failed to increment andor_coin', error: err });
+                        }
+
+                        console.log('Update results:', updateResults);
+
+                        // Insert the record into the andor_buy_history table
+                        const insertHistorySql = `
+                            INSERT INTO andor_buy_history (user_id, amount, value)
+                            VALUES (?, ?, ?);
+                        `;
+
+                        con.query(insertHistorySql, [refer_by, incrementAmount, andorCoin], (err, insertResults) => {
+                            if (err) {
+                                console.error('Error inserting into andor_buy_history:', err);
+                                return res.status(500).json({ status: 'error', message: 'Failed to insert into andor_buy_history', error: err });
+                            }
+
+                            console.log('Insert results:', insertResults);
+
+                            res.json({ status: 'success', message: 'andor_coin incremented and history recorded' });
+                        });
+                    });
+                });
+            });
+        });
+    });
+}); 
+
+
+
+  app.put('/approveUser/:userId', (req, res) => {
     const userId = req.params.userId;
 
     if (!userId) {
@@ -1178,6 +1586,7 @@ app.put('/approveUser/:userId', (req, res) => {
     SET 
         approved = 1, 
         payment_ok = 1,
+        mining_status = 1,
         rejected = 0,
         approved_at = CURRENT_TIMESTAMP,
         backend_wallet = backend_wallet + (
@@ -1197,13 +1606,15 @@ app.put('/approveUser/:userId', (req, res) => {
         FROM joining_fee
         WHERE id = 1`; 
 
-    const incrementCurrTeamForReferrerQuery = `
-        UPDATE users AS u1
-        JOIN users AS u2 ON u1.id = u2.refer_by
+        const incrementCurrTeamForReferrerQuery = `
+ UPDATE users AS u1
+        JOIN users AS u2 ON u1.id = u2.id
         JOIN levels AS l ON u2.team + 1 >= l.min_team AND u2.team + 1 <= l.max_team
         SET u1.team = u2.team + 1,
-            u1.level = l.level
-        WHERE u2.id = ?;
+            u1.level = l.level,
+            u1.level_updated = IF(u1.level <> l.level, 1, u1.level_updated)
+        WHERE u1.id = ?;
+
     `;
 
     const incrementTodayTeamForReferrerQuery = `
@@ -1222,6 +1633,10 @@ app.put('/approveUser/:userId', (req, res) => {
             u.balance = u.balance + (c1.direct_bonus * (j.joining_fee / 100)), 
             u.backend_wallet = u.backend_wallet + COALESCE((c2.indirect_bonus * (j.joining_fee / 100)), 0)
         WHERE u.id = ?`;
+
+    const insertIntoWinstukBuyHistoryQuery = `
+        INSERT INTO winstuk_buy_history (user_id, amount, value, created_at, created_date)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_DATE)`;
 
     const IncrementsChain = (referrerId, depth) => {
         if (depth < 7) {
@@ -1276,8 +1691,8 @@ app.put('/approveUser/:userId', (req, res) => {
                             const indirectBonusPercentage = (indirectBonus * (joiningFee / 100));
                            
                             const updateBalancesQuery = `
-                                UPDATE users
-                                SET andor_coin = andor_coin + ?,
+                                  UPDATE users
+                                SET winstuk_coin = winstuk_coin + ?,
                                     backend_wallet = backend_wallet + ?
                                 WHERE id = ?`;
 
@@ -1287,7 +1702,15 @@ app.put('/approveUser/:userId', (req, res) => {
                                     return;
                                 }
 
-                                IncrementsChain(referrerId, depth + 1);
+                                con.query(insertIntoWinstukBuyHistoryQuery, [referrerId, directBonusPercentage,directBonusPercentage ], (err, insertResult) => {
+                                    if (err) {
+                                        console.error('Error inserting into winstuk_buy_history:', err);
+                                        return;
+                                    }
+
+                                    IncrementsChain(referrerId, depth + 1);
+                                    console.log('Updated balances for referrer and inserted into winstuk_buy_history:', insertResult);
+                                });
                             });
                         });
                     });
@@ -1373,7 +1796,6 @@ app.put('/approveUser/:userId', (req, res) => {
 
 
 
-
 app.get('/withdrawal-requests', (req, res) => {
     const userId = req.session.userId;
 
@@ -1381,7 +1803,7 @@ app.get('/withdrawal-requests', (req, res) => {
         return res.status(401).json({ error: 'User not logged in' });
     }
 
-    const sql = 'SELECT fee,user_id,account_number, request_date, reject, amount, bank_name, approved FROM withdrawal_requests WHERE user_id = ? ORDER BY request_date DESC';
+    const sql = 'SELECT fee,user_id,account_number,account_name, request_date, reject, amount, bank_name, approved FROM withdrawal_requests WHERE user_id = ? ORDER BY request_date DESC';
 
     con.query(sql, [userId], (err, results) => {
         if (err) {
@@ -1395,15 +1817,13 @@ app.get('/withdrawal-requests', (req, res) => {
             bank_name: request.bank_name,
             approved: request.approved,
             reject: request.reject,
+	            account_name: request.account_name,
             account_number: request.account_number,
             fee:request.fee
         }));
         res.json(formattedResults);
     });
 });
-
-
-
 
 
 app.get('/all-withdrawal-requests', (req, res) => {
@@ -1434,9 +1854,6 @@ app.get('/all-withdrawal-requests', (req, res) => {
       });
   });
 
-
-
-
 app.post('/approve-withdrawal', async (req, res) => {
     const { userId, requestId, amount } = req.body;
 
@@ -1451,8 +1868,10 @@ app.post('/approve-withdrawal', async (req, res) => {
 
     const updateUserBalanceAndTotalWithdrawalSql = `
         UPDATE users
-        SET balance = 0,
-            total_withdrawal = total_withdrawal + ?
+        SET balance = balance - ?,
+            total_withdrawal = total_withdrawal + ?,
+            withdrawalAttempts = withdrawalAttempts + 1
+
         WHERE id = ?`;
 
     const deleteUserClicksSql = `
@@ -1479,7 +1898,7 @@ app.post('/approve-withdrawal', async (req, res) => {
                 return res.status(400).json({ error: 'Could not find the withdrawal request or it is already approved' });
             }
 
-            con.query(updateUserBalanceAndTotalWithdrawalSql, [amount, userId], (error, results) => {
+            con.query(updateUserBalanceAndTotalWithdrawalSql, [amount, amount, userId], (error, results) => {
                 if (error) {
                     return con.rollback(() => {
                         res.status(500).json({ error: 'Internal Server Error' });
@@ -1493,7 +1912,6 @@ app.post('/approve-withdrawal', async (req, res) => {
                         });
                     }
 
-                    // Added code to delete referrals
                     con.query(deleteReferralsSql, [userId], (error, deleteResult) => {
                         if (error) {
                             return con.rollback(() => {
@@ -1516,6 +1934,7 @@ app.post('/approve-withdrawal', async (req, res) => {
         });
     });
 });
+
 
 
 
@@ -1705,14 +2124,12 @@ app.post('/mining-status', (req, res) => {
     const user_id = req.session.userId;
     const sqlUpdateStatus = 'UPDATE users SET mining_status = 1 WHERE id = ? AND mining_status = 0';
 
-    // Update the mining status to 1 for the specific user with status 0
     con.query(sqlUpdateStatus, [user_id], (err, result) => {
         if (err) {
             console.log('Error updating mining status:', err);
             return res.status(500).json({ status: 'error', error: 'Failed to update mining status' });
         }
 
-        // Check if any rows were affected (i.e., if the user's status was updated)
         if (result.affectedRows > 0) {
             return res.status(200).json({ status: 'success', data: 'Mining status updated successfully' });
         } else {
@@ -2205,6 +2622,7 @@ app.post('/update-accounts', (req, res) => {
     res.json({ success: true, message: 'Accounts updated successfully.' });
 });
 
+
 app.get('/dashboard-data', (req, res) => {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -2213,21 +2631,44 @@ app.get('/dashboard-data', (req, res) => {
 
     const sql = `
         SELECT 
-            (SELECT COUNT(*) FROM users WHERE approved = 1) as approvedUsersCount,
+            (SELECT COUNT(*) FROM users WHERE approved = 1 and id !=953) as approvedUsersCount,
             (SELECT COUNT(*) FROM users WHERE approved = 1 AND approved_at >= ? AND approved_at < ?) as approvedUsersCountToday,
-            (SELECT SUM(amount) FROM withdrawal_requests where approved='approved') as totalWithdrawal ,
-            (SELECT SUM(amount) FROM withdrawal_requests WHERE DATE(approved_time) = CURDATE()) as totalAmountToday,
+            (SELECT SUM(amount) FROM withdrawal_requests where approved='approved' and user_id != 953) as totalWithdrawal ,
+            (SELECT SUM(amount) FROM withdrawal_requests WHERE DATE(approved_time and user_id != 953) = CURDATE()) as totalAmountToday,
             (SELECT COUNT(*) FROM users WHERE payment_ok = 0 AND approved = 0) as unapprovedUnpaidUsersCount,
-            (SELECT SUM(amount) as total_amount FROM withdrawal_requests WHERE DATE(approved_time) = CURDATE()) as totalAmountTodayWithdrawal,
-            (SELECT SUM(jf.joining_fee * (SELECT COUNT(*) FROM users WHERE approved = 1)) FROM joining_fee jf) as totalReceived,
-            (SELECT SUM(jf.joining_fee * (SELECT COUNT(*) FROM users WHERE approved = 1 AND approved_at >= ? AND approved_at < ?)) FROM joining_fee jf) as totalReceivedToday
+            (SELECT SUM(amount) as total_amount FROM withdrawal_requests WHERE DATE(approved_time) = CURDATE() and user_id != 953)  as totalAmountTodayWithdrawal,
+            (SELECT SUM(jf.joining_fee * (SELECT COUNT(*) FROM users WHERE approved = 1 )) FROM joining_fee jf) as totalReceived,
+            (SELECT SUM(jf.joining_fee * (SELECT COUNT(*) FROM users WHERE approved = 1 AND approved_at >= ? AND approved_at < ?)) FROM joining_fee jf) as totalReceivedToday,
+            (SELECT SUM(backend_wallet) from users WHERE approved=1 and id != 953) as backend_wallet,
+            (SELECT sum(balance) from users WHERE approved=1 and id != 953) as balance,
+            (SELECT sum(amount) from bonus_history  where 1 and user_id != 953 ) as bonus,
+            (SELECT sum(winstuk_coin) from users  where approved=1 and id != 953 ) as _24_karat,
+            (SELECT sum(andor_coin) from users  where approved=1  and id != 953) as _18_karat,
+
+
+                
+
+            ( SELECT
+        ((SELECT joining_fee FROM joining_fee WHERE id = 1) / 100) * 
+        (
+            (SELECT SUM(direct_bonus + indirect_bonus) FROM commission)
+
+        +
+           (SELECT initial_percent from initial_fee)
+
+            ) * (SELECT count(*) from users WHERE approved=1 and id != 953) 
+                    + (SELECT SUM(amount) FROM bonus_history where 1 and user_id != 953) + (SELECT SUM(winstuk_coin) from users  where approved=1 and id != 953 ) + (SELECT SUM(andor_coin) from users  where approved=1 and id != 953 ) 
+                    
+) as will_give
+        
     `;
 
     con.query(sql, [today, tomorrow, today, tomorrow], (err, results) => {
         if (err) {
+            console.log(err);
+            
             return res.status(500).json({ success: false, message: 'An error occurred while fetching dashboard data.' });
         }
-
         const dashboardData = {
             approvedUsersCount: results[0].approvedUsersCount,
             approvedUsersCountToday: results[0].approvedUsersCountToday,
@@ -2236,13 +2677,23 @@ app.get('/dashboard-data', (req, res) => {
             unapprovedUnpaidUsersCount: results[0].unapprovedUnpaidUsersCount,
             totalAmountTodayWithdrawal: results[0].totalAmountTodayWithdrawal,
             totalReceived: results[0].totalReceived,
-            totalReceivedToday: results[0].totalReceivedToday
-        };
+            totalReceivedToday: results[0].totalReceivedToday,
+            backend_wallet: results[0].backend_wallet,
+            users_balance:results[0].balance,
+            users_bonus:results[0].bonus,
+            todayIncome:(results[0].totalReceivedToday)-(results[0].totalAmountTodayWithdrawal),
+            totalIncome:results[0].totalReceived-results[0].totalWithdrawal,
+            will_give:results[0].will_give-results[0].totalWithdrawal,
+            _24_karat:results[0]._24_karat,
+            _18_karat:results[0]._18_karat
 
+
+        };
+        console.log(dashboardData);
+        
         res.status(200).json({ success: true, dashboardData });
     });
 });
-
 
 
 app.get('/get-total-withdrawal', (req, res) => {
@@ -2313,7 +2764,7 @@ app.get('/unapproved-unpaid-users-count', (req, res) => {
 
   const fetchApprovedUserNames = (referByUserId) => {
     return new Promise((resolve, reject) => {
-      const fetchNamesQuery = 'SELECT id, name ,whatsapp,backend_wallet, profile_picture FROM users WHERE refer_by = ? AND approved = 1';
+      const fetchNamesQuery = 'SELECT id, name FROM users WHERE refer_by = ? AND approved = 1';
       con.query(fetchNamesQuery, [referByUserId], (err, results) => {
         if (err) {
           reject(err);
@@ -2338,9 +2789,7 @@ app.get('/unapproved-unpaid-users-count', (req, res) => {
     }
   });
 
-// --------------------------------------------------
-// Coin Base
-// --------------------------------------------------
+
 app.get('/userCoins/:userId', (req, res) => {
     const userId = req.params.userId;
 
@@ -2386,61 +2835,39 @@ app.get('/userCoins/:userId', (req, res) => {
 });
 
 
+  
+  
+ 
+app.post('/WinstukbuyHistory/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const coinName = req.body.coinName;
+    console.log(coinName);
+    
+    if (!coinName) {
+        return res.status(400).json({ status: 'error', error: 'History not Available' });
+    }
 
+    const fetchQuery = `SELECT * FROM ${coinName} WHERE user_id = ? ORDER BY created_at DESC`;
 
+    con.query(fetchQuery, [userId], (err, result) => {
+        if (err) {
+            return res.status(500).json({ status: 'error', error: 'History not Available' });
+        }
+    
+        console.log('Fetched data:', result); 
 
-// app.post('/sellCoins/:userId', (req, res) => {
-//     const userId = req.params.userId;
-//     const { amount, coin,table,value } = req.body;
-// console.log(amount,coin,table,value);
-//     if (!amount) {
-//         return res.status(400).json({ status: 'error', error: 'Amount is required' });
-//     }
+        const sellHistory = result.map(row => ({
+            id: row.id,
+            
+            amount: row.amount,
+            date: row.created_at,
+            value: row.value
 
-//     const coinColumnName = `${coin.toLowerCase()}`;
-//     const deductQuery = `UPDATE users SET balance = balance + ?, ${coinColumnName} = 0 WHERE id = ?`;
-//     con.beginTransaction(function(err) {
-//         if (err) {
-//             console.error('Transaction error:', err);
-//             return res.status(500).json({ status: 'error', error: 'Failed to start transaction' });
-//         }
+        }));
 
-//         con.query(deductQuery, [amount, userId], (err, result) => {
-//             if (err) {
-//                 console.error('Error selling coins:', err);
-//                 con.rollback(function() {
-//                     return res.status(500).json({ status: 'error', error: 'Failed to sell coins' });
-//                 });
-//             }
-
-//             const sellHistoryQuery = `INSERT INTO ${table} (user_id, amount, value) VALUES (?, ?, ?)`;
-//             con.query(sellHistoryQuery, [userId, amount, value], (err, result) => {
-//                 if (err) {
-//                     console.error('Error adding to sell history:', err);
-//                     con.rollback(function() {
-//                         return res.status(500).json({ status: 'error', error: 'Failed to add to sell history' });
-//                     });
-//                 }
-
-//                 con.commit(function(err) {
-//                     if (err) {
-//                         console.error('Commit error:', err);
-//                         con.rollback(function() {
-//                             return res.status(500).json({ status: 'error', error: 'Failed to commit transaction' });
-//                         });
-//                     }
-
-//                     res.json({ status: 'success', message: 'Coins sold successfully' });
-//                 });
-//             });
-//         });
-//     });
-// });
-
-
-
-
-
+        res.json({ status: 'success', sellHistory: sellHistory });
+    });
+});
 
 
 
@@ -2475,7 +2902,6 @@ app.post('/WinstuksellHistory/:userId', (req, res) => {
         res.json({ status: 'success', sellHistory: sellHistory });
     });
 });
-
 
 
 
@@ -2684,10 +3110,10 @@ app.get('/total-usdt', (req, res) => {
                     andor_value: andor_value,
                     hizo_value: hizo_value,
                     kiton_value: kiton_value,
-                    winstuk_total: winstuk_coin * winstuk_value,
-                    andor_total: andor_coin * andor_value,
-                    hizo_total: hizo_coin * hizo_value,
-                    kiton_total: kiton_coin * kiton_value
+                    winstuk_total: winstuk_coin / winstuk_value,
+                    andor_total: andor_coin / andor_value,
+                    hizo_total: hizo_coin / hizo_value,
+                    kiton_total: kiton_coin / kiton_value
                 }
             });
         });
@@ -2695,7 +3121,22 @@ app.get('/total-usdt', (req, res) => {
 });
 const getUserIdFromSession = (req, res, next) => {
     if (req.session && req.session.userId) {
-      res.json({ userId: req.session.userId });
+      const userId = req.session.userId;
+  
+      con.query('SELECT payment_ok, approved FROM users WHERE id = ?', [userId], (error, results) => {
+        if (error) {
+          console.error('Error fetching user data:', error);
+          res.status(500).json({ error: 'Internal server error' });
+          return;
+        }
+  
+        if (results.length > 0) {
+          const { payment_ok, approved } = results[0];
+          res.json({ userId, paymentOk: payment_ok, approved });
+        } else {
+          res.status(404).json({ error: 'User not found' });
+        }
+      });
     } else {
       res.status(401).json({ error: 'User not authenticated' });
     }
@@ -2703,21 +3144,23 @@ const getUserIdFromSession = (req, res, next) => {
   
   app.get('/getUserIdFromSession', getUserIdFromSession);
   
+  
+  
 app.post('/update-whatsapp', (req, res) => {
-    const { userId, whatsappNumber } = req.body;
+    const { userId, country } = req.body;
     
 console.log(req.body);
-    if (!userId || !whatsappNumber) {
+    if (!userId || !country) {
         return res.status(400).json({ error: 'User ID and WhatsApp number are required' });
     }
 
     const updateUserWhatsappSql = `
         UPDATE users 
-        SET whatsapp = ? 
+        SET country = ? 
         WHERE id = ?;
     `;
 
-    con.query(updateUserWhatsappSql, [whatsappNumber, userId], (err, result) => {
+    con.query(updateUserWhatsappSql, [country, userId], (err, result) => {
         if (err) {
             console.error('Error executing query', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -2728,71 +3171,11 @@ console.log(req.body);
         } else {
             return res.status(404).json({ error: 'No matching user found' });
         }
-    });
-});
-app.post('/give-bonus', (req, res) => {
-    const bonusQuery = `
-        UPDATE users u
-        JOIN (
-            SELECT 
-                u2.refer_by,
-                COUNT(u2.id) AS referred_count
-            FROM 
-                users u2
-            WHERE 
-                u2.approved_at IS NOT NULL 
-                AND DATE(u2.approved_at) = CURDATE()
-            GROUP BY 
-                u2.refer_by
-        ) AS referrals ON u.id = referrals.refer_by
-        JOIN bonus_setting bs ON referrals.referred_count BETWEEN bs.min_referred_count AND bs.max_referred_count
-        SET 
-            u.hizo_coin = u.hizo_coin + bs.reward;
-    `;
-    
-    con.query(bonusQuery, (err, result) => {
-        if (err) {
-            return res.status(500).json({ status: 'error', error: 'Failed to give bonus' });
-        }
-        
-        res.json({ status: 'success' });
-    });
-});
+    });   
+});   
 
-app.get('/bonus-settings', (req, res) => {
-    // Execute SQL query to fetch data from bonus_setting table
-    const fetchSettingsQuery = 'SELECT * FROM bonus_setting';
-    
-    con.query(fetchSettingsQuery, (err, result) => {
-        if (err) {
-            return res.status(500).json({ status: 'error', error: 'Failed to fetch bonus settings' });
-        }
-        
-        // If data fetched successfully, return it in the response
-        res.json({ status: 'success', data: result });
-    });
+https.createServer(options, app).listen(PORT, () => {
+  console.log('HTTPS Server running on port '+PORT);
 });
-app.put('/bonus-settings/:id', (req, res) => {
-    const settingId = req.params.id;
-    const { min_referred_count, max_referred_count, reward } = req.body;
-    
-    const updateSettingQuery = `
-        UPDATE bonus_setting
-        SET min_referred_count = ?, max_referred_count = ?, reward = ?
-        WHERE id = ?
-    `;
-
-    con.query(updateSettingQuery, [min_referred_count, max_referred_count, reward, settingId], (err, result) => {
-        if (err) {
-            return res.status(500).json({ status: 'error', error: 'Failed to update bonus setting' });
-        }
-
-        res.json({ status: 'success', message: 'Bonus setting updated successfully' });
-    });
-});
-app.listen(PORT, () => {
-    console.log('Listening on port ' + PORT);
-});
-
 
 
